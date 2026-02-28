@@ -1,0 +1,13 @@
+Subject: Billing error - charged twice
+
+From: sarah.lee@demo.co.za
+2025-11-05
+
+Hi team,
+
+My invoice INV-2025-001 shows payment deducted twice from my account last month. Can you please check and refund the duplicate R8,866.50?
+
+Order ref: same as invoice.
+
+Regards,
+Sarah

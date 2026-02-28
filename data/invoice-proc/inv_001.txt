@@ -1,0 +1,17 @@
+INVOICE #INV-2025-001
+Date: 2025-11-15
+From: Acme Supplies Ltd
+Address: 123 Industrial Rd, Johannesburg
+To: Stephan's Demo Company
+Address: Durban, KZN
+
+Description          Qty   Unit Price   Total
+Widget A             50    R120.00      R6,000.00
+Gadget B             20    R85.50       R1,710.00
+Subtotal:                         R7,710.00
+VAT (15%):                        R1,156.50
+Total Due:                        R8,866.50
+
+Due Date: 2025-12-15
+Payment: EFT to Acc 1234567890, BankXYZ
+Thank you for your business!

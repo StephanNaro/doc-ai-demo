@@ -1,0 +1,14 @@
+Employment Agreement
+
+Employer: Stephan Demo Company
+Employee: Bob Smith
+
+Role: Sales Manager
+Commencement: 2025-03-15
+Remuneration: R960,000 annual + 10% commission
+Leave Entitlement: 18 days per year
+Probation: 3 months
+Termination Notice: 2 months after probation
+Remote Work: Allowed 3 days/week
+
+Confidentiality and IP Assignment clauses apply.
