@@ -6,103 +6,160 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 #[derive(Parser, Debug)]
-#[command(version, about = "Simple invoice AI demo using Ollama")]
+#[command(version, about = "Invoice AI demo using Ollama - scans folder for relevant files")]
 struct Args {
-    /// The question to ask about the invoices (e.g. "Extract total and due date from inv_001.txt")
+    /// The question to ask about the invoices
     query: String,
 
-    /// Optional: specific invoice filename (without .txt), e.g. inv_001
-    #[arg(short, long)]
-    file: Option<String>,
-
-    /// Ollama model to use (default: llama3.2 or whatever you have)
+    /// Ollama model to use (e.g. llama3.2)
     #[arg(short, long, default_value = "llama3.2")]
     model: String,
 }
 
 #[derive(Serialize)]
-struct OllamaGenerateRequest {
+struct OllamaRequest {
     model: String,
     prompt: String,
-    stream: bool,           // false = get full response at once
+    stream: bool,
+    format: String,           // "json" to force structured output
     options: Option<serde_json::Value>,
 }
 
 #[derive(Deserialize, Debug)]
-struct OllamaGenerateResponse {
+struct OllamaResponse {
     response: String,
     done: bool,
+}
+
+fn find_relevant_files(data_dir: &Path, query: &str) -> Vec<PathBuf> {
+    let mut matches = Vec::new();
+    let lower_query = query.to_lowercase();
+
+    if let Ok(entries) = fs::read_dir(data_dir) {
+        for entry in entries.flatten() {
+            if let Some(file_name) = entry.file_name().to_str() {
+                if file_name.ends_with(".txt") {
+                    let path = entry.path();
+                    // Simple heuristic: if query mentions invoice number or file stem
+                    let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("").to_lowercase();
+                    if lower_query.contains(&stem) || lower_query.contains("invoice") {
+                        matches.push(path);
+                    }
+                }
+            }
+        }
+    }
+
+    // Fallback: if no specific match, use all files (or first few)
+    if matches.is_empty() {
+        if let Ok(entries) = fs::read_dir(data_dir) {
+            for entry in entries.flatten().take(1) {
+                if entry.path().extension().and_then(|e| e.to_str()) == Some("txt") {
+                    matches.push(entry.path());
+                }
+            }
+        }
+    }
+
+    matches
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Args::parse();
 
-    // 1. Find and load invoice content
     let data_dir = Path::new("data/invoice-proc");
-    let content = if let Some(filename) = args.file {
-        // Specific file requested
-        let path = data_dir.join(format!("{}.txt", filename));
-        fs::read_to_string(&path).with_context(|| format!("Cannot read {}", path.display()))?
-    } else {
-        // For demo: load first file, or concatenate a few
-        // (In real version: search by keyword in query)
-        let path = data_dir.join("inv_001.txt");
-        fs::read_to_string(&path).with_context(|| "No default file found")?
-    };
+    if !data_dir.exists() {
+        anyhow::bail!("Data folder not found: {}", data_dir.display());
+    }
 
-    println!("Using invoice content from file:\n{}\n", content.lines().take(5).collect::<Vec<_>>().join("\n"));
+    println!("Scanning folder: {}", data_dir.display());
 
-    // 2. Build prompt
+    // 1. Find relevant invoice files
+    let relevant_files = find_relevant_files(data_dir, &args.query);
+    if relevant_files.is_empty() {
+        anyhow::bail!("No invoice files found in {}", data_dir.display());
+    }
+
+    println!("Using {} relevant invoice(s):", relevant_files.len());
+    for path in &relevant_files {
+        println!("  - {}", path.display());
+    }
+
+    // 2. Load content from files
+    let mut contents = String::new();
+    for path in relevant_files {
+        let text = fs::read_to_string(&path)
+            .with_context(|| format!("Failed to read {}", path.display()))?;
+        contents.push_str(&format!("\n--- Invoice from {} ---\n{}\n", path.display(), text));
+    }
+
+    // 3. Build structured prompt
     let prompt = format!(
-        r#"
-You are an invoice extraction assistant. Answer concisely and accurately based ONLY on the provided invoice text.
-Include the source invoice if relevant.
-If the question is about extraction, return in this format:
-- Vendor: ...
-- Total Due: ...
-- Due Date: ...
-- Other key fields: ...
+        r#"You are a precise invoice calculator. Use ONLY the numbers and text below. Do NOT invent values.
 
-Invoice text:
-{content}
+Rules:
+- Return ONLY valid JSON — no explanations outside the JSON.
+- For sums: add exactly the totals shown; do not round or estimate.
+- List every invoice you used.
+- If asked for summary of amounts, output: {{ "total_sum": "Rxx,xxx.xx", "invoices": [{{ "file": "...", "total": "R..." }}, ...] }}
+
+Documents:
+{contents}
 
 Question: {query}
 
-Answer:
-"#,
-    content = content,
-    query = args.query,
-);
+Respond with JSON only."#,
+        contents = contents,
+        query = args.query,
+    );
 
-    // 3. Call Ollama
+    // 4. Call Ollama
     let client = Client::new();
     let ollama_url = "http://localhost:11434/api/generate";
 
-    let request_body = OllamaGenerateRequest {
+    let request_body = OllamaRequest {
         model: args.model,
         prompt,
         stream: false,
-        options: None,
+        format: "json".to_string(),
+        options: Some(json!({
+            "temperature": 0.0,
+            "top_p": 0.95,
+        })),
     };
+
+    println!("\nSending request to Ollama... (this may take 5-30 seconds with llama3.2)");
 
     let res = client
         .post(ollama_url)
         .json(&request_body)
         .send()
         .await
-        .context("Failed to reach Ollama (is it running?)")?;
+        .context("Cannot reach Ollama — is `ollama serve` or `ollama run llama3.2` active?")?;
 
-    if !res.status().is_success() {
-        anyhow::bail!("Ollama returned error: {}", res.status());
+    let status = res.status();
+
+    if !status.is_success() {
+        let text = res.text().await.unwrap_or_else(|_| "No response body".to_string());
+        anyhow::bail!(
+            "Ollama failed with status {}.\nBody: {}",
+            status,
+            text.trim()
+        );
     }
 
-    let ollama_res: OllamaGenerateResponse = res.json().await.context("Failed to parse Ollama response")?;
+    let ollama_res: OllamaResponse = res.json().await.context("Invalid JSON from Ollama")?;
 
-    println!("\n=== AI Answer ===\n{}", ollama_res.response.trim());
+    println!("\n=== Structured Answer (JSON) ===\n{}", ollama_res.response.trim());
+
+    // Optional pretty-print
+    if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(&ollama_res.response) {
+        println!("\nPretty-printed:\n{}", serde_json::to_string_pretty(&json_val)?);
+    }
 
     Ok(())
 }
