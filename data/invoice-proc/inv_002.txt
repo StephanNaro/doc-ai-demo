@@ -1,0 +1,16 @@
+Invoice No: 2025/4567
+Issued: 2025-12-01
+Supplier: TechTrend Innovations
+Cape Town, WC
+
+Customer: Stephan Demo
+Durban
+
+Item                 Quantity   Price ea   Amount
+Laptop Stand         10         R450.00    R4,500.00
+USB-C Hub            15         R320.00    R4,800.00
+Subtotal                                 R9,300.00
+VAT 15%                                  R1,395.00
+Grand Total                              R10,695.00
+
+Payment terms: Net 30 days
