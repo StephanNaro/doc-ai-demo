@@ -1,0 +1,99 @@
+<?php $this->setPageTitle('Document AI Demo');?>
+<h1 class="SectionHeading">Document AI Demo</h1>
+
+<div style="max-width: 800px; margin: 2rem auto; padding: 1rem; font-family: system-ui, sans-serif;">
+  <h2>Invoice Q&A</h2>
+  <p>Ask a question about the invoices (e.g. totals, vendors, due dates…)</p>
+
+  <form id="query-form">
+    <div style="margin-bottom: 1rem;">
+      <textarea 
+        id="query" 
+        rows="3" 
+        placeholder="Example: What is the total due on INV-2025-001?&#10;Or: Summarize all invoice amounts" 
+        style="width: 100%; padding: 0.8rem; font-size: 1rem; border: 1px solid #ccc; border-radius: 6px;"
+        required
+      ></textarea>
+    </div>
+
+    <button 
+      type="submit" 
+      id="submit-btn"
+      style="padding: 0.8rem 1.5rem; background: #0066cc; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 1rem;"
+    >
+      Ask
+    </button>
+
+    <span id="loading" style="margin-left: 1rem; color: #666; display: none;">Thinking…</span>
+  </form>
+
+  <div id="result" style="margin-top: 2rem; padding: 1rem; background: #f8f9fa; border: 1px solid #ddd; border-radius: 6px; white-space: pre-wrap; min-height: 100px;">
+    <em>Result will appear here…</em>
+  </div>
+</div>
+
+<script>
+  const form = document.getElementById('query-form');
+  const queryInput = document.getElementById('query');
+  const submitBtn = document.getElementById('submit-btn');
+  const loading = document.getElementById('loading');
+  const resultDiv = document.getElementById('result');
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const query = queryInput.value.trim();
+    if (!query) return;
+
+    // UI feedback
+    submitBtn.disabled = true;
+    loading.style.display = 'inline';
+    resultDiv.innerHTML = '<em>Waiting for response…</em>';
+
+    try {
+      const response = await fetch('http://localhost:8001/query', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query }),
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Server error ${response.status}: ${text}`);
+      }
+
+      const data = await response.json();
+
+      // Format the answer nicely
+      let html = '';
+
+      if (data.error) {
+        html = `<strong style="color: red;">Error:</strong> ${data.error}`;
+      } else {
+        // Show the AI's JSON answer (pretty-printed)
+        if (data.answer && typeof data.answer === 'object') {
+          html += '<strong>Answer:</strong><pre style="background:#fff; padding:1rem; border:1px solid #eee; overflow:auto;">'
+               + JSON.stringify(data.answer, null, 2)
+               + '</pre>';
+        } else {
+          html += '<strong>Raw answer:</strong><pre>' + JSON.stringify(data.answer) + '</pre>';
+        }
+
+        // Show which files were used
+        if (data.used_files && data.used_files.length > 0) {
+          html += '<p><strong>Used files:</strong> ' + data.used_files.join(', ') + '</p>';
+        }
+      }
+
+      resultDiv.innerHTML = html;
+    } catch (err) {
+      resultDiv.innerHTML = `<strong style="color: red;">Failed:</strong> ${err.message}`;
+      console.error(err);
+    } finally {
+      submitBtn.disabled = false;
+      loading.style.display = 'none';
+    }
+  });
+</script>
