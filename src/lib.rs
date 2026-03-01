@@ -57,20 +57,26 @@ pub async fn query_ollama(
     model: &str,
     contents: String,
     query: &str,
+    category: &str,
 ) -> Result<String> {
     let client = Client::new();
     let ollama_url = "http://localhost:11434/api/generate";
 
+    let system_role = match category {
+        "contracts" | "employment-contracts" => "You are an expert employment contract reviewer. Focus on clauses, notice periods, leave, salary, non-compete, etc.",
+        "support" | "customer-support"       => "You are a customer support summarizer. Extract issues, customer name, requested action, and suggest next steps.",
+        "knowledge" | "knowledge-base"       => "You are a company policy and FAQ assistant. Answer questions based on internal knowledge base documents only.",
+        _                                    => "You are a precise invoice processor. Extract amounts, dates, vendors, etc. accurately.",
+    };
+    
     let prompt = format!(
-        r#"You are a precise invoice processor. Answer using ONLY the provided data.
-Be concise. Cite sources (file names) when possible.
+        r#"{system_role}
 
-For extraction/summary questions return JSON like:
-{{
-  "answer": "brief summary or extracted value",
-  "sources": ["inv_001.txt", ...],
-  "details": {{ ... optional fields ... }}
-}}
+Rules:
+- Answer using ONLY the provided documents.
+- Return ONLY valid JSON — no extra text.
+- Include "sources" array with file names used.
+- For questions about extraction/summary, use appropriate keys (e.g. "total_due", "answer", "details").
 
 Documents:
 {contents}
@@ -78,6 +84,7 @@ Documents:
 Question: {query}
 
 Respond with JSON only."#,
+        system_role = system_role,
         contents = contents,
         query = query,
     );
