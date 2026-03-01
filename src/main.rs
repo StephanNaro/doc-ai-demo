@@ -18,6 +18,8 @@ use doc_ai_demo::*;
 #[derive(serde::Deserialize)]
 struct QueryRequest {
     query: String,
+    #[serde(default)]  // makes category optional, defaults to None
+    category: Option<String>,
 }
 
 #[derive(serde::Serialize)]
@@ -72,7 +74,23 @@ async fn query(
     req: Json<QueryRequest>,
     _state: &State<Arc<()>>,  // placeholder; add data_dir later if needed
 ) -> Result<CorsResponder<Json<ApiResponse>>, status::Custom<String>> {
-    let data_dir = std::path::Path::new("data/invoices");
+    let category = req.category.as_deref().unwrap_or("invoices").to_lowercase();
+
+    let base_dir = match category.as_str() {
+        "contracts" | "employment-contracts" => "data/employment-contracts",
+        "support" | "customer-support"       => "data/customer-support",
+        "knowledge" | "knowledge-base"       => "data/knowledge-base",
+        _                                    => "data/invoices",  // default
+    };
+
+    let data_dir = std::path::Path::new(base_dir);
+
+    if !data_dir.exists() {
+        return Err(status::Custom(
+            Status::BadRequest,
+            format!("Category folder not found: {}", base_dir),
+        ));
+    }
 
     let relevant_files = find_relevant_files(data_dir, &req.query);
     if relevant_files.is_empty() {
@@ -95,7 +113,7 @@ async fn query(
         file_names.push(fname);
     }
 
-    match query_ollama("llama3.2", contents, &req.query).await {
+    match query_ollama("llama3.2", contents, &req.query, &category).await {
         Ok(raw_json) => {
             let parsed: serde_json::Value = match serde_json::from_str(&raw_json) {
                 Ok(v) => v,

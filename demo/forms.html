@@ -1,17 +1,33 @@
-<?php $this->setPageTitle('Document AI Demo');?>
-<h1 class="SectionHeading">Document AI Demo</h1>
-
 <div style="max-width: 800px; margin: 2rem auto; padding: 1rem; font-family: system-ui, sans-serif;">
-  <h2>Invoice Q&A</h2>
-  <p>Ask a question about the invoices (e.g. totals, vendors, due dates…)</p>
+  <h2>Document AI Demo</h2>
+  <p>Ask natural-language questions about your documents.</p>
+
+  <!-- Tabs -->
+  <div class="tabs" style="display: flex; border-bottom: 2px solid #ddd; margin-bottom: 1.5rem;">
+    <button class="tab-button active" data-category="invoices"     data-placeholder="Example: What is the total due on INV-2025-001? Or: Summarize all invoice amounts">
+      Invoices
+    </button>
+    <button class="tab-button"         data-category="contracts"    data-placeholder="Example: What is Alice's notice period? Or: Compare leave entitlement in Alice and Bob's contracts">
+      Employment Contracts
+    </button>
+    <button class="tab-button"         data-category="support"      data-placeholder="Example: Summarize the damaged product ticket. Or: What was the billing error in Sarah's ticket?">
+      Customer Support
+    </button>
+    <button class="tab-button"         data-category="knowledge"    data-placeholder="Example: How many annual leave days do full-time employees get? Or: What is the remote work policy?">
+      Knowledge Base
+    </button>
+  </div>
+
+  <!-- Hidden input for category -->
+  <input type="hidden" id="category" value="invoices">
 
   <form id="query-form">
     <div style="margin-bottom: 1rem;">
       <textarea 
         id="query" 
-        rows="3" 
-        placeholder="Example: What is the total due on INV-2025-001?&#10;Or: Summarize all invoice amounts" 
-        style="width: 100%; padding: 0.8rem; font-size: 1rem; border: 1px solid #ccc; border-radius: 6px;"
+        rows="4" 
+        placeholder="Example: What is the total due on INV-2025-001? Or: Summarize all invoice amounts"
+        style="width: 100%; padding: 0.8rem; font-size: 1rem; border: 1px solid #ccc; border-radius: 6px; resize: vertical;"
         required
       ></textarea>
     </div>
@@ -27,25 +43,72 @@
     <span id="loading" style="margin-left: 1rem; color: #666; display: none;">Thinking…</span>
   </form>
 
-  <div id="result" style="margin-top: 2rem; padding: 1rem; background: #f8f9fa; border: 1px solid #ddd; border-radius: 6px; white-space: pre-wrap; min-height: 100px;">
+  <div id="result" style="margin-top: 2rem; padding: 1rem; background: #f8f9fa; border: 1px solid #ddd; border-radius: 6px; white-space: pre-wrap; min-height: 120px;">
     <em>Result will appear here…</em>
   </div>
 </div>
 
+<style>
+  .tabs {
+    display: flex;
+    gap: 2px;
+  }
+  .tab-button {
+    flex: 1;
+    padding: 0.8rem 1rem;
+    background: #f0f0f0;
+    border: none;
+    border-bottom: 3px solid transparent;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: all 0.2s;
+  }
+  .tab-button:hover {
+    background: #e0e0e0;
+  }
+  .tab-button.active {
+    background: white;
+    border-bottom: 3px solid #0066cc;
+    font-weight: bold;
+  }
+</style>
+
 <script>
-  const form = document.getElementById('query-form');
+  const tabs = document.querySelectorAll('.tab-button');
+  const categoryInput = document.getElementById('category');
   const queryInput = document.getElementById('query');
+  const form = document.getElementById('query-form');
   const submitBtn = document.getElementById('submit-btn');
   const loading = document.getElementById('loading');
   const resultDiv = document.getElementById('result');
 
+  // Tab switching
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      // Remove active from all, add to clicked
+      tabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+
+      // Update hidden category
+      categoryInput.value = tab.dataset.category;
+
+      // Update placeholder and value
+      queryInput.placeholder = tab.dataset.placeholder;
+      queryInput.value = '';
+
+      // Optional: clear previous result when switching tabs
+      // resultDiv.innerHTML = '<em>Result will appear here…</em>';
+    });
+  });
+
+  // Form submit (same as before, but now reads category from hidden input)
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
 
     const query = queryInput.value.trim();
+    const category = categoryInput.value;
     if (!query) return;
 
-    // UI feedback
     submitBtn.disabled = true;
     loading.style.display = 'inline';
     resultDiv.innerHTML = '<em>Waiting for response…</em>';
@@ -53,10 +116,8 @@
     try {
       const response = await fetch('http://localhost:8001/query', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ query }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, category })
       });
 
       if (!response.ok) {
@@ -66,22 +127,18 @@
 
       const data = await response.json();
 
-      // Format the answer nicely
       let html = '';
-
       if (data.error) {
         html = `<strong style="color: red;">Error:</strong> ${data.error}`;
       } else {
-        // Show the AI's JSON answer (pretty-printed)
         if (data.answer && typeof data.answer === 'object') {
-          html += '<strong>Answer:</strong><pre style="background:#fff; padding:1rem; border:1px solid #eee; overflow:auto;">'
+          html += '<strong>Answer:</strong><pre style="background:#fff; padding:1rem; border:1px solid #eee; overflow:auto; max-height:400px;">'
                + JSON.stringify(data.answer, null, 2)
                + '</pre>';
         } else {
           html += '<strong>Raw answer:</strong><pre>' + JSON.stringify(data.answer) + '</pre>';
         }
 
-        // Show which files were used
         if (data.used_files && data.used_files.length > 0) {
           html += '<p><strong>Used files:</strong> ' + data.used_files.join(', ') + '</p>';
         }
