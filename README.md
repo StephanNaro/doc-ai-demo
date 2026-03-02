@@ -54,10 +54,10 @@ Built with Rust (Rocket backend) + plain HTML/JS frontend. No cloud APIs, no dat
 ## Usage Examples
 
 ### Command Line
-See, or run, the test-script in `test/curl-test.sh` for `curl` usage.
+See, or run, the test-script in `test/curl-test.sh` for `curl` usage examples.
 
 ### HTML
-`demo/forms.html` contains a tabbed interface showing sample questions as placeholders and allowing interactive querying. The file can be loaded directly into your browser for demo purposes, but is best wrapped in suitable HTML, PHP, etc.
+`demo/tabbed.html` contains a tabbed interface showing sample questions as placeholders and allowing interactive querying. The file can be loaded directly into your browser for demo purposes, but is best wrapped in suitable HTML, PHP, etc.
 
 ## Known Limitations
 
