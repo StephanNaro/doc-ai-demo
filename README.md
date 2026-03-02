@@ -51,39 +51,13 @@ Built with Rust (Rocket backend) + plain HTML/JS frontend. No cloud APIs, no dat
    ```
    → Listens on http://localhost:8001 (configurable via code or env `ROCKET_PORT`)
 
-5. Copy and paste `demo/forms.html` into a page accessible to your browser, eg an MVC, and open it in your browser and start querying!
-
 ## Usage Examples
 
-Use the tabbed interface (which shows sample questions as placeholders) or send JSON via curl/Postman:
+### Command Line
+See, or run, the test-script in `test/curl-test.sh` for `curl` usage.
 
-### Invoices
-```bash
-curl -X POST http://localhost:8001/query \
-  -H "Content-Type: application/json" \
-  -d '{"query": "What is the total due on INV-2025-001?", "category": "invoices"}'
-```
-
-### Employment Contracts
-```bash
-curl -X POST http://localhost:8001/query \
-  -H "Content-Type: application/json" \
-  -d '{"query": "What is Bob Smiths notice period?", "category": "contracts"}'
-```
-
-### Customer Support
-```bash
-curl -X POST http://localhost:8001/query \
-  -H "Content-Type: application/json" \
-  -d '{"query": "Summarize the damaged product complaint", "category": "support"}'
-```
-
-### Knowledge Base
-```bash
-curl -X POST http://localhost:8001/query \
-  -H "Content-Type: application/json" \
-  -d '{"query": "How many annual leave days for full-time?", "category": "knowledge"}'
-```
+### HTML
+`demo/forms.html` contains a tabbed interface showing sample questions as placeholders and allowing interactive querying. The file can be loaded directly into your browser for demo purposes, but is best wrapped in suitable HTML, PHP, etc.
 
 ## Known Limitations
 
@@ -104,8 +78,8 @@ curl -X POST http://localhost:8001/query \
 - Multi-turn chat (keep history in prompt or session)
 - Better error handling & loading states
 
-## License
+## License, Inspiration, and Development
 
-GPL 3.0
+This project is licensed under the GNU General Public License v3.0 (GPL-3.0). See [LICENSE](LICENSE) for details.
 
-Built as a learning/hobby project inspired by real-world AI document tools.
+Built as a learning/hobby project inspired by a job ad and real-world AI document tools, with considerable assistance from an AI agent.
