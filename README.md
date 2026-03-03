@@ -78,8 +78,10 @@ See, or run, the test-script in `test/curl-test.sh` for `curl` usage examples.
 - Multi-turn chat (keep history in prompt or session)
 - Better error handling & loading states
 
-## License, Inspiration, and Development
+## License, Inspiration, Development, and Disclaimer
 
 This project is licensed under the GNU General Public License v3.0 (GPL-3.0). See [LICENSE](LICENSE) for details.
 
 Built as a learning/hobby project inspired by a job ad and real-world AI document tools, with considerable assistance from an AI agent.
+
+It should be noted that **no thought has been given to security** in this project, as my knowledge of security matters is very limited.
