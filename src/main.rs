@@ -9,7 +9,7 @@ use rocket::Request;
 use rocket::Response;
 use rocket::response::{status, self, Responder};
 use rocket::serde::json::Json;
-use rocket::{State, fs::relative};
+use rocket::State;
 use rocket::fairing::{Fairing, Info, Kind};
 use std::sync::Arc;
 
@@ -77,10 +77,11 @@ async fn query(
     let category = req.category.as_deref().unwrap_or("invoices").to_lowercase();
 
     let base_dir = match category.as_str() {
-        "contracts" | "employment-contracts" => "data/employment-contracts",
-        "support" | "customer-support"       => "data/customer-support",
-        "knowledge" | "knowledge-base"       => "data/knowledge-base",
-        _                                    => "data/invoices",  // default
+        "invoices" | "invoice" | "invoicing"                               => "data/invoices",
+        "contracts" | "employment-contracts" | "contract" | "employment"   => "data/employment-contracts",
+        "support" | "customer-support" | "tickets" | "support-tickets"     => "data/customer-support",
+        "knowledge" | "knowledge-base" | "kb" | "policies" | "faq"         => "data/knowledge-base",
+        _                                                                  => "data/invoices",  // default
     };
 
     let data_dir = std::path::Path::new(base_dir);
@@ -88,7 +89,7 @@ async fn query(
     if !data_dir.exists() {
         return Err(status::Custom(
             Status::BadRequest,
-            format!("Category folder not found: {}", base_dir),
+            format!("Category folder '{}' not found. Valid categories: invoices, contracts, support, knowledge", base_dir),
         ));
     }
 

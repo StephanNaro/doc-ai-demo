@@ -63,20 +63,27 @@ pub async fn query_ollama(
     let ollama_url = "http://localhost:11434/api/generate";
 
     let system_role = match category {
-        "contracts" | "employment-contracts" => "You are an expert employment contract reviewer. Focus on clauses, notice periods, leave, salary, non-compete, etc.",
-        "support" | "customer-support"       => "You are a customer support summarizer. Extract issues, customer name, requested action, and suggest next steps.",
-        "knowledge" | "knowledge-base"       => "You are a company policy and FAQ assistant. Answer questions based on internal knowledge base documents only.",
-        _                                    => "You are a precise invoice processor. Extract amounts, dates, vendors, etc. accurately.",
-    };
+    "contracts" | "employment-contracts" | "contract" | "employment" => 
+        "You are an expert employment contract reviewer. Focus on clauses, notice periods, leave entitlement, salary, non-compete, confidentiality, probation, remote work, etc. Cite exact wording where possible.",
+
+    "support" | "customer-support" | "tickets" | "support-tickets" => 
+        "You are a customer support analyst. Summarize the issue, customer details, requested action, severity, and suggest a helpful next reply or resolution steps.",
+
+    "knowledge" | "knowledge-base" | "kb" | "policies" | "faq" => 
+        "You are a company policy and internal knowledge assistant. Answer clearly and directly from the provided documents. Quote sections or rules verbatim when relevant.",
+
+    _ =>  // defaults to invoices
+        "You are a precise invoice extraction and summarization assistant. Extract vendor, amounts (subtotal, VAT, total due), due date, invoice number, and payment terms exactly as written. Perform simple sums only if explicitly asked.",
+};
     
     let prompt = format!(
         r#"{system_role}
 
 Rules:
 - Answer using ONLY the provided documents.
-- Return ONLY valid JSON — no extra text.
-- Include "sources" array with file names used.
-- For questions about extraction/summary, use appropriate keys (e.g. "total_due", "answer", "details").
+- Return ONLY valid JSON — no extra text outside the JSON object.
+- Always include a "sources" array with the file names used.
+- Use appropriate keys depending on the category (e.g. "total_due", "notice_period", "issue_summary", "policy_answer").
 
 Documents:
 {contents}

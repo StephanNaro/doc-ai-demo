@@ -8,13 +8,14 @@ It supports four document categories:
 - Customer Support Tickets (summarization, issue extraction)
 - Knowledge Base / Policies (FAQ-style answers)
 
-Built with Rust (Rocket backend) + plain HTML/JS frontend. No cloud APIs, no data leaves your machine.
+Built with Rust (Rocket backend) + local C# & plain HTML/JS frontends. No cloud APIs, no data leaves your machine.
 
 ## Features
 
 - REST API endpoint `/query` accepting natural-language questions
 - Category-aware prompting (different system roles per document type)
-- HTML shows tabbed interface for easy switching between document types
+- C# desktop client (WinForms) for native feel
+- HTML demo shows tabbed interface for easy switching between document types
 - Pretty-printed JSON responses with source file references
 - CORS support for cross-origin requests
 
@@ -26,6 +27,7 @@ Built with Rust (Rocket backend) + plain HTML/JS frontend. No cloud APIs, no dat
   ```bash
   ollama pull llama3.2
   ```
+- .NET 10.0 (C#) - install from https://dotnet.microsoft.com/en-us/download
 
 ## Setup
 
@@ -51,13 +53,25 @@ Built with Rust (Rocket backend) + plain HTML/JS frontend. No cloud APIs, no dat
    ```
    → Listens on http://localhost:8001 (configurable via code or env `ROCKET_PORT`)
 
+5. Build desktop frontend:
+   ```bash
+   cd DocAiClient
+   dotnet build
+   ```
+
 ## Usage Examples
 
 ### Command Line
-See, or run, the test-script in `test/curl-test.sh` for `curl` usage examples.
+   See, or run, the test-script in `test/curl-test.sh` for `curl` usage examples.
+
+### Desktop Application
+   ```bash
+   dotnet run
+   ```
+   Choose which document category to query with the dropdown menu. Enter a question relevant to the category of documents, click the **Ask** button, and wait for a response (which may take 30 seconds on a slow machine like mine). For examples of questions please see `test/curl-test.sh` or `html_demo/tabbed.html`.
 
 ### HTML
-`demo/tabbed.html` contains a tabbed interface showing sample questions as placeholders and allowing interactive querying. The file can be loaded directly into your browser for demo purposes, but is best wrapped in suitable HTML, PHP, etc.
+   `html_demo/tabbed.html` contains a tabbed interface showing sample questions as placeholders and allowing interactive querying. The file can be loaded directly into your browser for demo purposes, but is best wrapped in suitable HTML, PHP, etc.
 
 ## Known Limitations
 
@@ -72,10 +86,9 @@ See, or run, the test-script in `test/curl-test.sh` for `curl` usage examples.
 
 ## Possible Future Improvements
 
-- C# desktop client (WinForms/WPF) for native feel
 - Configure Rocket's port via command line
 - Add semantic search / embeddings for better file relevance
-- Multi-turn chat (keep history in prompt or session)
+- The desktop app could be improved to be as user-friendly as the HTML demo, or better, eg implement multi-turn chat (keep history in prompt or session)
 - Better error handling & loading states
 
 ## License, Inspiration, Development, and Disclaimer
