@@ -316,7 +316,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "doc-ai-demo"
+name = "doc-ai-server"
 version = "0.1.0"
 dependencies = [
  "anyhow",

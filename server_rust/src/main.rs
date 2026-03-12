@@ -13,7 +13,7 @@ use rocket::State;
 use rocket::fairing::{Fairing, Info, Kind};
 use std::sync::Arc;
 
-use doc_ai_demo::*;
+use doc_ai_server::*;
 
 #[derive(serde::Deserialize)]
 struct QueryRequest {
