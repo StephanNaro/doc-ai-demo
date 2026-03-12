@@ -14,10 +14,10 @@ Built with Rust (Rocket backend) + local C# & plain HTML/JS frontends. No cloud 
 
 - REST API endpoint `/query` accepting natural-language questions
 - Category-aware prompting (different system roles per document type)
-- C# desktop client (WinForms) for native feel
-- HTML demo shows tabbed interface for easy switching between document types
 - Pretty-printed JSON responses with source file references
 - CORS support for cross-origin requests
+- C# desktop client (WinForms) for native feel
+- HTML demo shows tabbed interface for easy switching between document types
 
 ## Requirements
 
@@ -51,7 +51,7 @@ Built with Rust (Rocket backend) + local C# & plain HTML/JS frontends. No cloud 
    ```bash
    cargo run
    ```
-   → Listens on http://localhost:8001 (configurable via code or env `ROCKET_PORT`)
+   → Listens on http://localhost:8001
 
 5. Build desktop frontend:
    ```bash
@@ -87,6 +87,7 @@ Built with Rust (Rocket backend) + local C# & plain HTML/JS frontends. No cloud 
 ## Possible Future Improvements
 
 - Configure Rocket's port via command line
+- Configure model used by Ollama via command line
 - Add semantic search / embeddings for better file relevance
 - The desktop app could be improved to be as user-friendly as the HTML demo, or better, eg implement multi-turn chat (keep history in prompt or session)
 - Better error handling & loading states

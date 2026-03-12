@@ -1,11 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use anyhow::{Context, Result};
+use lru::LruCache;
+use once_cell::sync::Lazy;
+use regex::Regex;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use std::collections::{HashMap, HashSet};
 use std::fs;
+use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 
 #[derive(Serialize)]
 pub struct OllamaRequest {
@@ -22,35 +28,133 @@ pub struct OllamaResponse {
     pub done: bool,
 }
 
-pub fn find_relevant_files(data_dir: &Path, query: &str) -> Vec<PathBuf> {
-    let mut matches = Vec::new();
-    let lower_query = query.to_lowercase();
+// ==================== GLOBAL CACHE ====================
+// LRU cache with max 100 files (adjust as needed)
+static FILE_CACHE: Lazy<Arc<Mutex<LruCache<PathBuf, String>>>> = Lazy::new(|| {
+    Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(100).unwrap())))
+});
 
-    if let Ok(entries) = fs::read_dir(data_dir) {
-        for entry in entries.flatten() {
-            if let Some(file_name) = entry.file_name().to_str() {
-                if file_name.ends_with(".txt") {
-                    let path = entry.path();
-                    let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("").to_lowercase();
-                    if lower_query.contains(&stem) || lower_query.contains("invoice") {
-                        matches.push(path);
+pub fn get_cached_content(path: &Path) -> anyhow::Result<String> {
+    let mut cache = FILE_CACHE.lock().unwrap();
+
+    if let Some(cached) = cache.get(path) {
+        return Ok(cached.clone());
+    }
+
+    let content = fs::read_to_string(path)
+        .with_context(|| format!("Failed to read {}", path.display()))?;
+
+    cache.put(path.to_path_buf(), content.clone());
+    println!("Cached (LRU): {}", path.display());
+
+    Ok(content)
+}
+
+// ==================== INVERTED INDEX (uses cache) ====================
+static INVERTED_INDEX: Lazy<HashMap<String, Vec<String>>> = Lazy::new(|| {
+    let mut index: HashMap<String, Vec<String>> = HashMap::new();
+    let word_re = Regex::new(r"\b\w+\b").unwrap();
+
+    let categories = vec![
+        ("data/invoices", "invoices"),
+        ("data/employment-contracts", "contracts"),
+        ("data/customer-support", "support"),
+        ("data/knowledge-base", "knowledge"),
+    ];
+
+    for (dir_str, _) in categories {
+        let dir = Path::new(dir_str);
+        if !dir.exists() { continue; }
+
+        if let Ok(entries) = fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().and_then(|e| e.to_str()) == Some("txt") {
+                    // ← Use the cache here (so files are loaded only once)
+                    if let Ok(text) = get_cached_content(&path) {
+                        let lower_text = text.to_lowercase();
+                        for cap in word_re.captures_iter(&lower_text) {
+                            if let Some(m) = cap.get(0) {
+                                let word = m.as_str().to_string();
+                                let fname = path.file_name().unwrap().to_string_lossy().to_string();
+                                index.entry(word).or_default().push(fname);
+                            }
+                        }
                     }
                 }
             }
         }
     }
 
-    if matches.is_empty() {
-        if let Ok(entries) = fs::read_dir(data_dir) {
-            for entry in entries.flatten().take(2) {  // keep small
-                if entry.path().extension().and_then(|e| e.to_str()) == Some("txt") {
-                    matches.push(entry.path());
+    // Deduplicate filename lists
+    for files in index.values_mut() {
+        let set: HashSet<_> = files.drain(..).collect();
+        *files = set.into_iter().collect();
+    }
+
+    println!("✅ Inverted index built with {} unique words. All files cached.", index.len());
+    index
+});
+
+pub fn find_relevant_files(query: &str, category: &str) -> Vec<PathBuf> {
+    let lower_query = query.to_lowercase();
+    let query_words: HashSet<String> = lower_query
+        .split_whitespace()
+        .filter(|w| w.len() > 2)
+        .map(|w| w.to_string())
+        .collect();
+
+    if query_words.is_empty() {
+        return vec![];
+    }
+
+    // Collect candidates + count matches
+    let mut scored_files: Vec<(String, usize)> = Vec::new();
+
+    for (word, filenames) in INVERTED_INDEX.iter() {
+        if query_words.contains(word) {
+            for fname in filenames {
+                // Find or insert with score
+                if let Some((_, score)) = scored_files.iter_mut().find(|(f, _)| f == fname) {
+                    *score += 1;
+                } else {
+                    scored_files.push((fname.clone(), 1));
                 }
             }
         }
     }
 
-    matches
+    // Sort: highest score first, then stable by filename
+    scored_files.sort_by(|a, b| {
+        b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0))
+    });
+
+    // Take top N
+    let max_results = 4;
+    let top_fnames: Vec<String> = scored_files
+        .into_iter()
+        .take(max_results)
+        .map(|(f, score)| {
+            println!("Selected: {} (score: {})", f, score); // debug
+            f
+        })
+        .collect();
+
+    // Map to full paths
+    let base_dir = match category {
+        "contracts" | "employment-contracts" => "data/employment-contracts",
+        "support"   => "data/customer-support",
+        "knowledge" => "data/knowledge-base",
+        _           => "data/invoices",
+    };
+
+    top_fnames
+        .into_iter()
+        .filter_map(|fname| {
+            let path = Path::new(base_dir).join(&fname);
+            path.exists().then_some(path.to_path_buf())
+        })
+        .collect()
 }
 
 pub async fn query_ollama(

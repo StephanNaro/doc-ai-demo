@@ -1,9 +1,40 @@
+## Algorithms & Data Structures Used
+
+### Retrieval with Inverted Index
+
+Instead of scanning every file on each query, I build a simple inverted index at startup:
+- HashMap<String, Vec<String>> where key = normalized word, value = filenames containing it
+- Query words → union of matching files → score by overlap → top N fed to LLM
+
+This gives O(1) average-case word lookup and scales better than linear scan.
+
+“This is the core idea behind how search engines work.”
+
+### File Content Caching
+
+To avoid repeated disk reads, file contents are cached in a thread-safe `HashMap<PathBuf, String>` using `once_cell::sync::Lazy` + `Mutex`.  
+First access loads from disk; all later requests hit memory.
+
+This is a simple but effective **memoization** pattern (space-for-time tradeoff) — common when the same documents are queried repeatedly.
+
+### LRU Cache, Etc.
+
+Grok and I have done further work, but I think I'll be switching to C# in stead of Rust.
+
+
+
+
+
+
+
+
+
+
+## Grok's First Overview - Delete As Implemented
 Your current demo is already using several DS&A ideas implicitly, but we can make them much more explicit (both in code and in how you talk about the project). Below is a realistic list of places where classic algorithms & data structures either are already present or could be meaningfully added/improved — ranked roughly by how impressive/easy they are to implement and explain in an interview context.
 
 | # | Concept / Data Structure | Where it fits in your demo | Current state | Suggested improvement / explicit version |
 |---|---------------------------|----------------------------|---------------|-------------------------------------------|
-| 1 | **Inverted index / keyword → document map** | File relevance / retrieval step | Basic string contains + filename stem match | Replace the simple `find_relevant_files` with a real inverted index (HashMap<String, Vec<String>> where key = word, value = list of filenames containing it) built at startup |
-| 2 | **HashMap / HashSet** | Above + caching prompt contents | Already used implicitly via std::collections | Explicitly build a cache: `HashMap<PathBuf, String>` for file contents so you read disk only once |
 | 3 | **Priority Queue / Top-K selection** | Selecting top-N most relevant documents | Currently take(2) or keyword contains | Use `BinaryHeap` (max-heap) or `std::collections::BinaryHeap` with a custom score (e.g. number of matching keywords, or later tf-idf) |
 | 4 | **Trie / Prefix tree** | If you ever add autocomplete for queries | Not present | Optional future: Trie of all words in documents for query auto-complete |
 | 5 | **Vector similarity search** (cosine similarity + approximate nearest neighbors) | Semantic retrieval (the “real” RAG upgrade) | Keyword only | Replace keyword matching with sentence-transformers embeddings → store vectors in Vec<Vec<f32>> or use a crate like `hnsw` / `qdrant-lite` / `lance` for ANN search |
@@ -16,13 +47,11 @@ Your current demo is already using several DS&A ideas implicitly, but we can mak
 ### Quick wins you can do in < 1 hour that look strong in interviews
 
 1. **Inverted index** (most bang-for-buck)
-   - At startup: scan all files once, build `HashMap<String, Vec<String>>` (word → filenames)
-   - On query: split query into words, intersect the sets of filenames
-   - Very easy to explain: “This is the core idea behind how search engines work.”
+   - Completed
 
 2. **Top-k selection with BinaryHeap**
    - Score each file (e.g. count of matching keywords)
    - Use `BinaryHeap` to keep only the top 3–5
 
 3. **Simple caching**
-   - `lazy_static!` or `once_cell` + `Mutex<HashMap<String, String>>` for file contents
+   - Completed

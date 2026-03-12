@@ -93,7 +93,7 @@ async fn query(
         ));
     }
 
-    let relevant_files = find_relevant_files(data_dir, &req.query);
+    let relevant_files = find_relevant_files(&req.query, &category);
     if relevant_files.is_empty() {
         return Err(status::Custom(
             Status::BadRequest,
@@ -105,12 +105,12 @@ async fn query(
     let mut file_names = Vec::new();
 
     for path in relevant_files {
-        let text = match std::fs::read_to_string(&path) {
+        let text = match get_cached_content(&path) {
             Ok(t) => t,
             Err(e) => return Err(status::Custom(Status::InternalServerError, e.to_string())),
         };
         let fname = path.file_name().unwrap().to_string_lossy().to_string();
-        contents.push_str(&format!("\n--- Invoice: {} ---\n{}\n", fname, text));
+        contents.push_str(&format!("\n--- {} ---\n{}\n", fname, text));
         file_names.push(fname);
     }
 

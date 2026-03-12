@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 SECONDS=0
-echo -e "These tests require 2 minutes on my laptop running the llama3.2 model. Your mileage may vary.\n"
+echo -e "These tests require 30 seconds each on my laptop running the llama3.2 model. Your mileage may vary.\n"
 
 
 echo "  Querying Invoices..."
@@ -28,6 +28,13 @@ echo "  Querying Knowledge Base..."
 curl -X POST http://localhost:8001/query \
   -H "Content-Type: application/json" \
   -d '{"query": "How many annual leave days for full-time?", "category": "knowledge"}'
+echo -e "\n"
+
+
+echo "  Querying Customer Support..."
+curl -X POST http://localhost:8001/query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "damaged product arrived", "category": "support"}'
 echo -e "\n"
 
 
