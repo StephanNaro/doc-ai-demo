@@ -3,32 +3,19 @@
 #[macro_use]
 extern crate rocket;
 
-use anyhow::Result;
+use rocket::fairing::{Fairing, Info, Kind};
 use rocket::http::{Header, Status};
 use rocket::Request;
-use rocket::Response;
-use rocket::response::{status, self, Responder};
+use rocket::Response;   // Somehow different from response...
+use rocket::response::{self, Responder};
 use rocket::serde::json::Json;
 use rocket::State;
-use rocket::fairing::{Fairing, Info, Kind};
+use serde_json::{json, Value};
 use std::sync::Arc;
 
 use doc_ai_server::*;
 
-#[derive(serde::Deserialize)]
-struct QueryRequest {
-    query: String,
-    #[serde(default)]  // makes category optional, defaults to None
-    category: Option<String>,
-}
-
-#[derive(serde::Serialize)]
-struct ApiResponse {
-    answer: serde_json::Value,  // the raw JSON from Ollama
-    used_files: Vec<String>,
-    error: Option<String>,
-}
-
+// CORS fairing
 struct CORS;
 
 #[rocket::async_trait]
@@ -47,58 +34,61 @@ impl Fairing for CORS {
     }
 }
 
-// Helper to add CORS headers to any response
+// CORS wrapper
 struct CorsResponder<R>(R);
 
 impl<'r, 'o: 'r, R: Responder<'r, 'o>> Responder<'r, 'o> for CorsResponder<R> {
     fn respond_to(self, request: &'r Request<'_>) -> response::Result<'o> {
         let mut res = self.0.respond_to(request)?;
-
-        // Add CORS headers
         res.set_header(Header::new("Access-Control-Allow-Origin", "*")); // or specific origin like "http://localhost:your-mvc-port"
         res.set_header(Header::new("Access-Control-Allow-Methods", "POST, OPTIONS"));
         res.set_header(Header::new("Access-Control-Allow-Headers", "Content-Type"));
-
         Ok(res)
     }
 }
 
-// New OPTIONS route to handle preflight
+// OPTIONS preflight
 #[options("/query")]
 fn options_handler() -> CorsResponder<Status> {
     CorsResponder(Status::Ok)
 }
 
+// Main query handler
 #[post("/query", format = "json", data = "<req>")]
 async fn query(
     req: Json<QueryRequest>,
-    _state: &State<Arc<()>>,  // placeholder; add data_dir later if needed
-) -> Result<CorsResponder<Json<ApiResponse>>, status::Custom<String>> {
-    let category = req.category.as_deref().unwrap_or("invoices").to_lowercase();
-
-    let base_dir = match category.as_str() {
-        "invoices" | "invoice" | "invoicing"                               => "data/invoices",
-        "contracts" | "employment-contracts" | "contract" | "employment"   => "data/employment-contracts",
-        "support" | "customer-support" | "tickets" | "support-tickets"     => "data/customer-support",
-        "knowledge" | "knowledge-base" | "kb" | "policies" | "faq"         => "data/knowledge-base",
-        _                                                                  => "data/invoices",  // default
+    state: &State<Arc<Args>>,
+) -> CorsResponder<Json<Value>> {
+    let category_str = req.category.as_deref().unwrap_or_default();
+    let category = match Category::from_api_value(category_str) {
+        Some(cat) => cat,
+        None => {
+            let err = ErrorResponse {
+                error: true,
+                code: "invalid_category".to_string(),
+                message: format!(
+                    "Unknown category '{}'. Valid values: {}",
+                    category_str,
+                    Category::all_api_values_human()
+                ),
+                category: Some(category_str.to_string()),
+                query: Some(req.query.clone()),
+            };
+            return CorsResponder(Envelope::failure(err).into());
+        }
     };
 
-    let data_dir = std::path::Path::new(base_dir);
-
-    if !data_dir.exists() {
-        return Err(status::Custom(
-            Status::BadRequest,
-            format!("Category folder '{}' not found. Valid categories: invoices, contracts, support, knowledge", base_dir),
-        ));
-    }
-
     let relevant_files = find_relevant_files(&req.query, &category);
+
     if relevant_files.is_empty() {
-        return Err(status::Custom(
-            Status::BadRequest,
-            "No relevant invoice files found".to_string(),
-        ));
+        let err = ErrorResponse {
+            error: true,
+            code: "no_matches".to_string(),
+            message: format!("No relevant documents found in '{}' category", category.display_name()),
+            category: Some(category.api_value().to_string()),
+            query: Some(req.query.clone()),
+        };
+        return CorsResponder(Envelope::failure(err).into());
     }
 
     let mut contents = String::new();
@@ -107,38 +97,73 @@ async fn query(
     for path in relevant_files {
         let text = match get_cached_content(&path) {
             Ok(t) => t,
-            Err(e) => return Err(status::Custom(Status::InternalServerError, e.to_string())),
+            Err(e) => {
+                let err = ErrorResponse {
+                    error: true,
+                    code: "internal_server_error".to_string(),
+                    message: e.to_string(),
+                    category: Some(category.api_value().to_string()),
+                    query: Some(req.query.clone()),
+                };
+                return CorsResponder(Envelope::failure(err).into());
+            }
         };
+
         let fname = path.file_name().unwrap().to_string_lossy().to_string();
         contents.push_str(&format!("\n--- {} ---\n{}\n", fname, text));
         file_names.push(fname);
     }
 
-    match query_ollama("llama3.2", contents, &req.query, &category).await {
+    match query_ollama(&state.model.clone(), contents, &req.query, &category).await {
         Ok(raw_json) => {
-            let parsed: serde_json::Value = match serde_json::from_str(&raw_json) {
-                Ok(v) => v,
-                Err(_) => serde_json::json!({"raw": raw_json}),
-            };
+            let parsed: Value = serde_json::from_str(&raw_json)
+                .unwrap_or_else(|_| json!({"raw": raw_json}));
 
-            Ok(CorsResponder(Json(ApiResponse {
+            let api_resp = ApiResponse {
                 answer: parsed,
                 used_files: file_names,
                 error: None,
-            })))
+            };
+
+            CorsResponder(Envelope::success(api_resp).into())
         }
-        Err(e) => Err(status::Custom(
-            Status::InternalServerError,
-            e.to_string(),
-        )),
+        Err(e) => {
+            let err = ErrorResponse {
+                error: true,
+                code: "ollama_error".to_string(),
+                message: e.to_string(),
+                category: Some(category.api_value().to_string()),
+                query: Some(req.query.clone()),
+            };
+            CorsResponder(Envelope::failure(err).into())
+        }
     }
 }
 
+// Startup validation
 #[launch]
 fn rocket() -> _ {
+    let config = Args::parse();
+
+    // Validate folders
+    for cat in ALL_CATEGORIES {
+        let path = std::path::Path::new(cat.folder_path());
+        if !path.exists() || !path.is_dir() {
+            eprintln!("ERROR: Required data folder missing: {}", cat.folder_path());
+            std::process::exit(1);
+        }
+    }
+
+    println!("All data folders found. Starting server on port {}", config.port);
+    println!("Using Ollama model: {}", config.model);
+    println!("Supported categories:");
+    for cat in ALL_CATEGORIES {
+        println!("- {} ({}) → {}", cat.display_name(), cat.api_value(), cat.folder_path());
+    }
+
     rocket::build()
+        .configure(rocket::Config::figment().merge(("port", config.port)))
         .attach(CORS)
-        .configure(rocket::Config::figment().merge(("port", 8001)))
         .mount("/", routes![query, options_handler])
-        .manage(Arc::new(()))  // can later hold config or shared state
+        .manage(Arc::new(config))
 }
