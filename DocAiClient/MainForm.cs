@@ -54,22 +54,65 @@ namespace DocAiClient
                 var response = await _client.SendRequestAsync(ApiUri, json);
                 string body = await RestHttpClient.GetResponseBodyAsync(response);
 
-                if (response.IsSuccessStatusCode)
+                // Always expect 200 now
+                if (!response.IsSuccessStatusCode)
                 {
-                    try
+                    txtResult.Text = $"Unexpected server status: {response.StatusCode} ({response.ReasonPhrase})\r\n\r\nRaw response:\r\n{body}";
+                    return;
+                }
+
+                // Parse the envelope
+                try
+                {
+                    var doc = JsonDocument.Parse(body);
+                    var root = doc.RootElement;
+
+                    if (root.TryGetProperty("success", out var successProp) && successProp.ValueKind == JsonValueKind.True)
                     {
-                        var doc = JsonDocument.Parse(body);
-                        string pretty = JsonSerializer.Serialize(doc, new JsonSerializerOptions { WriteIndented = true });
-                        txtResult.Text = $"Category: {selectedCategory}\n\n{pretty}";
+                        // Success → show data
+                        if (root.TryGetProperty("data", out var dataProp))
+                        {
+                            string pretty = JsonSerializer.Serialize(
+                                dataProp,
+                                new JsonSerializerOptions { WriteIndented = true }
+                            );
+
+                            txtResult.Text = $"Category: {selectedCategory}\r\n\r\n{pretty}";
+                        }
+                        else
+                        {
+                            txtResult.Text = "Success response missing 'data' field:\r\n\r\n" + body;
+                        }
                     }
-                    catch
+                    else
                     {
-                        txtResult.Text = "Received success but response is not valid JSON:\n\n" + body;
+                        // Error path
+                        string errorMsg = "Unknown error";
+
+                        if (root.TryGetProperty("error", out var errorProp) && errorProp.ValueKind == JsonValueKind.Object)
+                        {
+                            var errObj = errorProp;
+
+                            string code = errObj.TryGetProperty("code", out var c) ? c.GetString() ?? "unknown" : "unknown";
+                            string message = errObj.TryGetProperty("message", out var m) ? m.GetString() ?? "" : "";
+                            string cat = errObj.TryGetProperty("category", out var catProp) ? catProp.GetString() ?? "" : "";
+                            string q = errObj.TryGetProperty("query", out var qProp) ? qProp.GetString() ?? "" : "";
+
+                            errorMsg = $"Error ({code}): {message}";
+                            if (!string.IsNullOrEmpty(cat)) errorMsg += $"\r\n\r\nCategory: {cat}\r\n";
+                            if (!string.IsNullOrEmpty(q)) errorMsg += $"\r\nQuery: \"{q}\"\r\n";
+                        }
+                        else
+                        {
+                            errorMsg = "Error response missing 'error' object:\r\n\r\n" + body;
+                        }
+
+                        txtResult.Text = errorMsg;
                     }
                 }
-                else
+                catch (JsonException ex)
                 {
-                    txtResult.Text = $"Server error {response.StatusCode} ({response.ReasonPhrase})\n\n{body}";
+                    txtResult.Text = $"Invalid JSON response:\r\n{ex.Message}\r\n\r\nRaw body:\r\n{body}";
                 }
             }
             catch (Exception ex)

@@ -101,7 +101,6 @@
     });
   });
 
-  // Form submit (same as before, but now reads category from hidden input)
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
 
@@ -128,20 +127,43 @@
       const data = await response.json();
 
       let html = '';
-      if (data.error) {
-        html = `<strong style="color: red;">Error:</strong> ${data.error}`;
-      } else {
-        if (data.answer && typeof data.answer === 'object') {
-          html += '<strong>Answer:</strong><pre style="background:#fff; padding:1rem; border:1px solid #eee; overflow:auto; max-height:400px;">'
-               + JSON.stringify(data.answer, null, 2)
-               + '</pre>';
-        } else {
-          html += '<strong>Raw answer:</strong><pre>' + JSON.stringify(data.answer) + '</pre>';
-        }
 
-        if (data.used_files && data.used_files.length > 0) {
-          html += '<p><strong>Used files:</strong> ' + data.used_files.join(', ') + '</p>';
+      if (data.success) {
+        // ── Success path ──
+        if (data.data && typeof data.data === 'object') {
+          // Pretty-print the ApiResponse contents
+          html += '<strong>Answer:</strong><pre style="background:#fff; padding:1rem; border:1px solid #eee; overflow:auto; max-height:400px;">'
+               + JSON.stringify(data.data, null, 2)
+               + '</pre>';
+
+          // Show used files if present
+          if (data.data.used_files && data.data.used_files.length > 0) {
+            html += '<p><strong>Used files:</strong> ' + data.data.used_files.join(', ') + '</p>';
+          }
+        } else {
+          // Rare fallback — raw data
+          html += '<strong>Raw response:</strong><pre>' + JSON.stringify(data.data) + '</pre>';
         }
+      } else if (data.error) {
+        // ── Structured error path ──
+        html = `<div style="color: #d32f2f; background: #ffebee; padding: 1rem; border-radius: 6px; border: 1px solid #ffcdd2;">
+          <strong>Error (${data.error.code || 'unknown'}):</strong><br>
+          ${data.error.message || 'An unknown error occurred.'}
+        </div>`;
+
+        // Optional: show category/query if present
+        if (data.error.category || data.error.query) {
+          html += '<p style="margin-top: 0.5rem; font-size: 0.9rem; color: #555;">';
+          if (data.error.category) html += `Category: ${data.error.category} `;
+          if (data.error.category && data.error.query) html += `<br />`;
+          if (data.error.query) html += `Query: "${data.error.query}"`;
+          html += '</p>';
+        }
+      } else {
+        // Fallback for completely unexpected responses
+        html = '<strong style="color: orange;">Unexpected response format</strong><pre>' 
+             + JSON.stringify(data, null, 2) 
+             + '</pre>';
       }
 
       resultDiv.innerHTML = html;
