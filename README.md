@@ -67,7 +67,7 @@ See [DSAideas.md](./DSAideas.md) for a detailed overview of DS&A concepts used i
 ## Usage Examples
 
 ### Command Line
-   See, or run, the test-script in `test/curl-test.sh` for `curl` usage examples.
+   See the test-script in `test/curl-test.sh` for `curl` usage examples.
 
 ### HTML
    `html_demo/tabbed.html` contains a tabbed interface showing sample questions as placeholders and allowing interactive querying. The file can be loaded directly into your browser for demo purposes, but is best wrapped in suitable HTML, PHP, etc.
