@@ -91,6 +91,7 @@ See [DSAideas.md](./DSAideas.md) for a detailed overview of DS&A concepts used i
 
 ## Possible Future Improvements
 
+- Create more automated tests.
 - Add semantic search / embeddings for better file relevance.
 - The desktop frontend app could be polished to be as user-friendly as the HTML demo. Or better, eg implement multi-turn chat (keep history in prompt or session).
 - Better error handling & loading states.
