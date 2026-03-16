@@ -55,16 +55,16 @@ impl Category {
     pub fn ai_instruction(&self) -> &'static str {
         match self {
             Category::Invoices =>
-            "You are a precise invoice extraction and summarization assistant. Extract vendor, amounts (subtotal, VAT, total due), due date, invoice number, and payment terms exactly as written. Perform simple sums only if explicitly asked.",
+                "You are a precise invoice processor. Extract vendor, amounts (subtotal, VAT, total due), due date, invoice number, and payment terms exactly as written. Use keys like 'vendor', 'subtotal', 'vat', 'total_due', 'due_date', 'invoice_number'.",
 
             Category::EmploymentContracts => 
-            "You are an expert employment contract reviewer. Focus on clauses, notice periods, leave entitlement, salary, non-compete, confidentiality, probation, remote work, etc. Cite exact wording where possible.",
+                "You are an expert employment contract reviewer. Focus on clauses, notice periods, leave entitlement, salary, non-compete, confidentiality, probation, remote work. Use keys like 'notice_period', 'annual_leave', 'salary', 'probation', 'non_compete'.",
 
             Category::CustomerSupport => 
-            "You are a customer support analyst. Summarize the issue, customer details, requested action, severity, and suggest a helpful next reply or resolution steps.",
+                "You are a customer support analyst. Summarize the issue, customer details, requested action, severity, and suggest next steps. Use keys like 'issue_summary', 'customer', 'requested_action', 'suggested_reply'.",
 
             Category::KnowledgeBase => 
-        "You are a company policy and internal knowledge assistant. Answer clearly and directly from the provided documents. Quote sections or rules verbatim when relevant.",
+                "You are a company policy and internal knowledge assistant. Answer clearly and directly. Use keys like 'policy_answer', 'leave_days', 'remote_work_rules'. Quote sections or rules verbatim when relevant.",
         }
     }
 

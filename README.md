@@ -13,6 +13,7 @@ Built with Rust (Rocket backend) + local C# & plain HTML/JS frontends. No cloud 
 ## Features
 
 - REST API endpoint `/query` accepting natural-language questions
+- Rocket's port and the model used by Ollama are configurable via the command line
 - Category-aware prompting (different system roles per document type)
 - Pretty-printed JSON responses with source file references
 - CORS support for cross-origin requests
@@ -68,14 +69,14 @@ See [DSAideas.md](./DSAideas.md) for a detailed overview of DS&A concepts used i
 ### Command Line
    See, or run, the test-script in `test/curl-test.sh` for `curl` usage examples.
 
+### HTML
+   `html_demo/tabbed.html` contains a tabbed interface showing sample questions as placeholders and allowing interactive querying. The file can be loaded directly into your browser for demo purposes, but is best wrapped in suitable HTML, PHP, etc.
+
 ### Desktop Application
    ```bash
    dotnet run
    ```
-   Choose which document category to query with the dropdown menu. Enter a question relevant to the category of documents, click the **Ask** button, and wait for a response (which may take 30 seconds on a slow machine like mine). For examples of questions please see `test/curl-test.sh` or `html_demo/tabbed.html`.
-
-### HTML
-   `html_demo/tabbed.html` contains a tabbed interface showing sample questions as placeholders and allowing interactive querying. The file can be loaded directly into your browser for demo purposes, but is best wrapped in suitable HTML, PHP, etc.
+   Choose which document category to query with the drop-down menu. Enter a question relevant to the category of documents, click the **Ask** button, and wait for a response (which may take 30 seconds on a slow machine like mine). For examples of questions please see `test/curl-test.sh` or `html_demo/tabbed.html`.
 
 ## Known Limitations
 
@@ -90,11 +91,9 @@ See [DSAideas.md](./DSAideas.md) for a detailed overview of DS&A concepts used i
 
 ## Possible Future Improvements
 
-- Configure Rocket's port via command line
-- Configure model used by Ollama via command line
-- Add semantic search / embeddings for better file relevance
-- The desktop app could be improved to be as user-friendly as the HTML demo, or better, eg implement multi-turn chat (keep history in prompt or session)
-- Better error handling & loading states
+- Add semantic search / embeddings for better file relevance.
+- The desktop frontend app could be polished to be as user-friendly as the HTML demo. Or better, eg implement multi-turn chat (keep history in prompt or session).
+- Better error handling & loading states.
 
 ## License, Inspiration, Development, and Disclaimer
 

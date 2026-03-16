@@ -31,8 +31,6 @@ pub async fn query_ollama(
     let client = Client::new();
     let ollama_url = "http://localhost:11434/api/generate";
 
-    let system_role = category.ai_instruction();
-
     let prompt = format!(
         r#"{system_role}
 
@@ -40,7 +38,9 @@ Rules:
 - Answer using ONLY the provided documents.
 - Return ONLY valid JSON — no extra text outside the JSON object.
 - Always include a "sources" array with the file names used.
-- Use appropriate keys depending on the category (e.g. "total_due", "notice_period", "issue_summary", "policy_answer").
+- Be concise, accurate, and quote exact wording when relevant.
+- Use clear, descriptive keys that make sense for the content (e.g. "total_due", "vendor", "issue", "policy", "leave_days").
+- If the question is about extraction or summary, include relevant fields naturally.
 
 Documents:
 {contents}
@@ -48,7 +48,7 @@ Documents:
 Question: {query}
 
 Respond with JSON only."#,
-        system_role = system_role,
+        system_role = category.ai_instruction(),
         contents = contents,
         query = query,
     );
