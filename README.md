@@ -19,6 +19,10 @@ Built with Rust (Rocket backend) + local C# & plain HTML/JS frontends. No cloud 
 - C# desktop client (WinForms) for native feel
 - HTML demo shows tabbed interface for easy switching between document types
 
+## Algorithms & Data Structures
+
+See [DSAideas.md](./DSAideas.md) for a detailed overview of DS&A concepts used in or suggested for this project.
+
 ## Requirements
 
 - Rust (stable toolchain) – install from https://rustup.rs

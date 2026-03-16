@@ -1,57 +1,117 @@
-## Algorithms & Data Structures Used
+# Algorithms & Data Structures in Doc API Demo
 
-### Retrieval with Inverted Index
+## Overview
 
-Instead of scanning every file on each query, I build a simple inverted index at startup:
-- HashMap<String, Vec<String>> where key = normalized word, value = filenames containing it
-- Query words → union of matching files → score by overlap → top N fed to LLM
+This project started as a simple local AI-powered document Q&A tool but quickly became an opportunity to apply real algorithms and data structures in a practical context.
 
-This gives O(1) average-case word lookup and scales better than linear scan.
+The goal was never to build the most advanced search engine, but to:
+- Demonstrate core CS concepts in a working system
+- Show understanding of trade-offs (time vs space, simplicity vs scalability)
 
-“This is the core idea behind how search engines work.”
+Many of the techniques used (or planned) are foundational ideas from search engines, information retrieval, caching systems, and RAG (Retrieval-Augmented Generation) pipelines.
 
-### File Content Caching
+The list below covers both what is already implemented and what could be added in future iterations.
 
-To avoid repeated disk reads, file contents are cached in a thread-safe `HashMap<PathBuf, String>` using `once_cell::sync::Lazy` + `Mutex`.  
-First access loads from disk; all later requests hit memory.
+## Already Incorporated
 
-This is a simple but effective **memoization** pattern (space-for-time tradeoff) — common when the same documents are queried repeatedly.
+These DS&A concepts are actively used in the current codebase.
 
-### LRU Cache, Etc.
+1. **Inverted Index**  
+   - **Used in**: `indexer.rs` → `INVERTED_INDEX`  
+   - **Purpose**: Fast keyword → document lookup (O(1) average-case per word)  
+   - **Implementation**: `HashMap<String, Vec<String>>` built at startup  
+   - **Benefit**: Avoids scanning every file on each query  
+   - **Current limitation**: Exact word match only (no stemming/lemmatization/synonyms)
 
-Grok and I have done further work, but I think I'll be switching to C# in stead of Rust.
+2. **Memoization / Content Caching**  
+   - **Used in**: `cache.rs` → `FILE_CACHE` (LRU via `lru` crate)  
+   - **Purpose**: Avoid repeated disk I/O — files loaded only once  
+   - **Implementation**: Global `LruCache<PathBuf, String>` (max 100 entries)  
+   - **Benefit**: Space-for-time tradeoff; essential when same files are queried repeatedly
 
+3. **Relevance Scoring (simple term overlap)**  
+   - **Used in**: `relevance.rs` → `find_relevant_files`  
+   - **Purpose**: Rank documents by how many query words they contain  
+   - **Implementation**: Count unique matching words → sort descending → take top 4  
+   - **Benefit**: Better than arbitrary selection; still very lightweight
 
+4. **HashMap / HashSet**  
+   - **Used throughout**: inverted index, scoring, deduplication of filenames  
+   - **Purpose**: O(1) lookups, fast membership testing, deduplication
 
+5. **Lazy Initialization**  
+   - **Used in**: `once_cell::sync::Lazy` for index and cache  
+   - **Purpose**: Build expensive structures only on first use (not at compile time)
 
+6. **Mutex + Arc for thread-safety**  
+   - **Used in**: global cache and index  
+   - **Purpose**: Safe concurrent access in Rocket's multi-threaded runtime
 
+## Unrealised / Future Ideas
 
+These are concepts that could be added to make the system more sophisticated.  
+Most are realistic next steps for scaling beyond a demo.
 
+1. **Top-k selection with Priority Queue / BinaryHeap**  
+   - **Status**: Not implemented  
+   - **Potential**: Replace `Vec` sort with `BinaryHeap` for efficient top-N extraction  
+   - **Complexity**: O(n log k) vs current O(n log n)  
+   - **Benefit**: Faster when n is large
 
+2. **TF-IDF scoring**  
+   - **Status**: Not implemented  
+   - **Potential**: Weight rare words higher than common ones  
+   - **Benefit**: Improves relevance over raw term count
 
+3. **Dense vector / semantic search (embeddings + cosine similarity)**  
+   - **Status**: Planned but not implemented  
+   - **Potential**: Replace keyword matching with sentence-transformers or Ollama embeddings  
+   - **Future**: Use `hnsw` or `qdrant-lite` for approximate nearest neighbors  
+   - **Benefit**: Handles synonyms, paraphrasing ("notice period" ≈ "termination notice")
 
-## Grok's First Overview - Delete As Implemented
-Your current demo is already using several DS&A ideas implicitly, but we can make them much more explicit (both in code and in how you talk about the project). Below is a realistic list of places where classic algorithms & data structures either are already present or could be meaningfully added/improved — ranked roughly by how impressive/easy they are to implement and explain in an interview context.
+4. **Trie / Prefix tree**  
+   - **Status**: Not implemented  
+   - **Potential**: For query auto-completion or prefix-based filtering  
+   - **Benefit**: O(m) lookup where m = prefix length
 
-| # | Concept / Data Structure | Where it fits in your demo | Current state | Suggested improvement / explicit version |
-|---|---------------------------|----------------------------|---------------|-------------------------------------------|
-| 3 | **Priority Queue / Top-K selection** | Selecting top-N most relevant documents | Currently take(2) or keyword contains | Use `BinaryHeap` (max-heap) or `std::collections::BinaryHeap` with a custom score (e.g. number of matching keywords, or later tf-idf) |
-| 4 | **Trie / Prefix tree** | If you ever add autocomplete for queries | Not present | Optional future: Trie of all words in documents for query auto-complete |
-| 5 | **Vector similarity search** (cosine similarity + approximate nearest neighbors) | Semantic retrieval (the “real” RAG upgrade) | Keyword only | Replace keyword matching with sentence-transformers embeddings → store vectors in Vec<Vec<f32>> or use a crate like `hnsw` / `qdrant-lite` / `lance` for ANN search |
-| 6 | **Sliding window / chunking algorithm** | Document splitting (currently whole files) | Whole-file content | Implement paragraph/sentence-aware chunking + overlapping windows |
-| 7 | **Sorting + stable sort** | Ranking results by score | No ranking | After scoring chunks/documents, sort by descending score (`.sort_by(|a,b| b.score.cmp(&a.score))`) |
-| 8 | **String searching algorithms** (Boyer-Moore, KMP, or regex) | Current keyword matching | Naive `.contains()` | Upgrade to `aho-corasick` crate (multi-pattern Aho-Corasick automaton) for fast multi-keyword search |
-| 9 | **Graph traversal** (if you add cross-document linking) | Future: “find related contracts” | Not present | Model documents as nodes, shared entities (names, dates) as edges → BFS/DFS for related docs |
-| 10 | **Dynamic programming / memoization** | Prompt caching / repeated queries | Not present | Memoize Ollama responses for identical query+category+files combo using `HashMap<String, String>` |
+5. **Aho-Corasick (multi-pattern string matching)**  
+   - **Status**: Not implemented  
+   - **Potential**: Faster multi-keyword search in documents  
+   - **Benefit**: O(n + z) vs naive `.contains()`
 
-### Quick wins you can do in < 1 hour that look strong in interviews
+6. **Graph traversal (BFS/DFS)**  
+   - **Status**: Not implemented  
+   - **Potential**: For cross-document linking (e.g. "find related contracts")  
+   - **Benefit**: Answer comparative or entity-based questions
 
-1. **Inverted index** (most bang-for-buck)
-   - Completed
+7. **Dynamic programming / memoization of LLM responses**  
+   - **Status**: Not implemented  
+   - **Potential**: Cache identical query+category+files combos  
+   - **Benefit**: Avoid redundant Ollama calls
 
-2. **Top-k selection with BinaryHeap**
-   - Score each file (e.g. count of matching keywords)
-   - Use `BinaryHeap` to keep only the top 3–5
+8. **Background incremental indexing**  
+   - **Status**: Not implemented  
+   - **Potential**: Use `notify` crate to watch folders and rebuild index parts on file change  
+   - **Benefit**: Handle real, changing document collections
 
-3. **Simple caching**
-   - Completed
+9. **Sharding / distributed index**  
+   - **Status**: Far future  
+   - **Potential**: Split index across multiple machines or processes  
+   - **Benefit**: Scale to millions of documents
+
+10. **LRU / LFU cache eviction policy**  
+    - **Status**: Partially implemented (LRU in `cache.rs`)  
+    - **Future**: Add bounded cache size for index entries themselves
+
+## Comments & Reflections
+
+- The current keyword-based inverted index is crude but fast and deterministic.
+- It misses synonyms/variants, but Ollama's language understanding compensates somewhat.
+- For a demo this is acceptable; in production we'd move to embeddings + vector search.
+- Caching + LRU already prevent most I/O bottlenecks for small-to-medium collections.
+- The project shows that even simple DS&A (HashMap, sorting, caching) can create a usable system — no need for over-engineering at demo scale.
+
+Future directions would likely involve:
+- Moving from keyword → dense vector retrieval
+- Adding incremental updates instead of full re-index on startup
+- Implementing proper ranking (BM25 or learned model)
